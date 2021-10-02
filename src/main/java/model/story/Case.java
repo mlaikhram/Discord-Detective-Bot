@@ -7,6 +7,7 @@ import java.util.ArrayList;
 
 public class Case implements DiscordEmbeddable {
 
+    private String caseId;
     private String name;
     private String author;
     private String iconUrl;
@@ -22,8 +23,17 @@ public class Case implements DiscordEmbeddable {
     public MessageEmbed getEmbed() {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle(name);
-        embedBuilder.setAuthor(author, null, iconUrl);
+        embedBuilder.setAuthor("Made by " + author, null, iconUrl);
+        embedBuilder.setFooter(caseId + "");
         return rules.applyToEmbedBuilder(embedBuilder).build();
+    }
+
+    public String getCaseId() {
+        return caseId;
+    }
+
+    public void setCaseId(String caseId) {
+        this.caseId = caseId;
     }
 
     public String getName() {

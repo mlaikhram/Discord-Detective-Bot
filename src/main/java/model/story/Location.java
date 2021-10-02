@@ -7,7 +7,7 @@ public class Location {
     private String name;
     private String description;
     private ArrayList<LocationCommand> commands;
-    private boolean isStarter;
+    private boolean starter;
 
     public String getName() {
         return name;
@@ -34,10 +34,10 @@ public class Location {
     }
 
     public boolean isStarter() {
-        return isStarter;
+        return starter;
     }
 
     public void setStarter(boolean starter) {
-        isStarter = starter;
+        this.starter = starter;
     }
 }

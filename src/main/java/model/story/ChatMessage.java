@@ -1,15 +1,19 @@
 package model.story;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 
-import java.time.temporal.TemporalAccessor;
+import java.awt.*;
+import java.time.ZoneId;
+import java.util.Date;
 
 public class ChatMessage implements DiscordEmbeddable {
 
     private Character author;
     private String text;
-    private TemporalAccessor timestamp;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd@HH:mm:ss.SSSZ")
+    private Date timestamp;
     private String imageUrl;
 
     private static final String THUMBNAIL_URL = "";
@@ -18,10 +22,10 @@ public class ChatMessage implements DiscordEmbeddable {
     public MessageEmbed getEmbed() {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setAuthor(author.getName(), null, author.getAvatarUrl());
-        embedBuilder.setColor(author.getColor());
+        embedBuilder.setColor(Color.decode(author.getColor()));
         embedBuilder.setDescription(text);
         embedBuilder.setImage(imageUrl);
-        embedBuilder.setTimestamp(timestamp);
+        embedBuilder.setTimestamp(timestamp.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
         embedBuilder.setThumbnail(THUMBNAIL_URL);
 
         return embedBuilder.build();
@@ -43,11 +47,11 @@ public class ChatMessage implements DiscordEmbeddable {
         this.text = text;
     }
 
-    public TemporalAccessor getTimestamp() {
+    public Date getTimestamp() {
         return timestamp;
     }
 
-    public void setTimestamp(TemporalAccessor timestamp) {
+    public void setTimestamp(Date timestamp) {
         this.timestamp = timestamp;
     }
 

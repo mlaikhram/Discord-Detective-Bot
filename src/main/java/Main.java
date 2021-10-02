@@ -14,7 +14,7 @@ public class Main {
         File file = new File("bot.yml");
         YmlConfig config = new ObjectMapper(new YAMLFactory()).readValue(file, YmlConfig.class);
         JDA jda = JDABuilder.createDefault(config.getDiscord().getToken())
-                .addEventListeners(new DetectiveListener())
+                .addEventListeners(new DetectiveListener(config))
                 .setActivity(Activity.listening("instructions"))
                 .build();
         jda.awaitReady();

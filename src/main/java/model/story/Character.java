@@ -9,15 +9,15 @@ public class Character implements DiscordEmbeddable {
 
     private String name;
     private String avatarUrl;
-    private Color color;
+    private String color;
     private FreeformEmbedBody bio;
-    private boolean isStarter;
+    private boolean starter;
 
     @Override
     public MessageEmbed getEmbed() {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setAuthor(name, null, avatarUrl);
-        embedBuilder.setColor(color);
+        embedBuilder.setColor(Color.decode(color));
         return bio.applyToEmbedBuilder(embedBuilder).build();
     }
 
@@ -37,11 +37,11 @@ public class Character implements DiscordEmbeddable {
         this.avatarUrl = avatarUrl;
     }
 
-    public Color getColor() {
+    public String getColor() {
         return color;
     }
 
-    public void setColor(Color color) {
+    public void setColor(String color) {
         this.color = color;
     }
 
@@ -54,10 +54,10 @@ public class Character implements DiscordEmbeddable {
     }
 
     public boolean isStarter() {
-        return isStarter;
+        return starter;
     }
 
     public void setStarter(boolean starter) {
-        isStarter = starter;
+        this.starter = starter;
     }
 }

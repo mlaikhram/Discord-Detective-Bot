@@ -11,8 +11,15 @@ public class YmlConfig {
     @JsonProperty
     private DiscordConfig discord;
 
+    @JsonProperty
+    private String casePath;
+
     public DiscordConfig getDiscord() {
         return discord;
+    }
+
+    public String getCasePath() {
+        return casePath;
     }
 
 }

@@ -11,7 +11,7 @@ public class InventoryItem implements DiscordEmbeddable {
     private String itemId;
     private String title;
     private FreeformEmbedBody embedBody;
-    private Color color;
+    private String color;
     private Member founder;
     private ItemType itemType;
 
@@ -21,7 +21,7 @@ public class InventoryItem implements DiscordEmbeddable {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle(title);
         embedBuilder.setAuthor(itemId);
-        embedBuilder.setColor(color);
+        embedBuilder.setColor(Color.decode(color));
         embedBuilder = embedBody.applyToEmbedBuilder(embedBuilder);
         embedBuilder.setThumbnail(itemType.getIconUrl());
         embedBuilder.setFooter((itemType == ItemType.PHOTO ? "Taken by " : "Found by ") + founder.getEffectiveName(), founder.getUser().getEffectiveAvatarUrl());
@@ -52,11 +52,11 @@ public class InventoryItem implements DiscordEmbeddable {
         this.embedBody = embedBody;
     }
 
-    public Color getColor() {
+    public String getColor() {
         return color;
     }
 
-    public void setColor(Color color) {
+    public void setColor(String color) {
         this.color = color;
     }
 

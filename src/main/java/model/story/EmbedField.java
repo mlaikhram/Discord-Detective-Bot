@@ -4,7 +4,7 @@ public class EmbedField {
 
     private String name;
     private String value;
-    private boolean isInline;
+    private boolean inline;
 
     public String getName() {
         return name;
@@ -23,10 +23,10 @@ public class EmbedField {
     }
 
     public boolean isInline() {
-        return isInline;
+        return inline;
     }
 
     public void setInline(boolean inline) {
-        isInline = inline;
+        this.inline = inline;
     }
 }

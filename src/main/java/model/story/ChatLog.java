@@ -7,6 +7,7 @@ public class ChatLog {
     private String name;
     private String description;
     private ArrayList<ChatMessage> messages;
+    private ArrayList<String> participants;
 
     public String getName() {
         return name;
@@ -30,5 +31,13 @@ public class ChatLog {
 
     public void setMessages(ArrayList<ChatMessage> messages) {
         this.messages = messages;
+    }
+
+    public ArrayList<String> getParticipants() {
+        return participants;
+    }
+
+    public void setParticipants(ArrayList<String> participants) {
+        this.participants = participants;
     }
 }
