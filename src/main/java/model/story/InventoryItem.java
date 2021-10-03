@@ -24,7 +24,11 @@ public class InventoryItem implements DiscordEmbeddable {
         embedBuilder.setColor(Color.decode(color));
         embedBuilder = embedBody.applyToEmbedBuilder(embedBuilder);
         embedBuilder.setThumbnail(itemType.getIconUrl());
-        embedBuilder.setFooter((itemType == ItemType.PHOTO ? "Taken by " : "Found by ") + founder.getEffectiveName(), founder.getUser().getEffectiveAvatarUrl());
+        embedBuilder
+                .setFooter((itemType == ItemType.PHOTO ? "Taken by " : "Found by ") + founder
+                        .getEffectiveName(), founder
+                        .getUser()
+                        .getEffectiveAvatarUrl());
         return embedBuilder.build();
     }
 

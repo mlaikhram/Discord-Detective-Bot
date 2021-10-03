@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import model.config.YmlConfig;
 import model.story.*;
 import model.story.Character;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
@@ -14,10 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,9 +34,15 @@ public class DetectiveListener extends ListenerAdapter {
     private static final String LOCATIONS = "locations";
 
     private final YmlConfig config;
+    private long id;
 
     public DetectiveListener(YmlConfig config) {
         this.config = config;
+    }
+
+    public void setId(long id) {
+        this.id = id;
+        logger.info("id: " + this.id);
     }
 
     @Override
@@ -63,8 +67,8 @@ public class DetectiveListener extends ListenerAdapter {
     public void onGuildMessageReceived(@Nonnull GuildMessageReceivedEvent event) {
         TextChannel textChannel = event.getMessage().getTextChannel();
         if (!event.getAuthor().isBot()) {
+            String rawMessage = event.getMessage().getContentRaw();
             if (textChannel.getName().equals(ADMIN_CONSOLE)) {
-                String rawMessage = event.getMessage().getContentRaw();
                 String[] messageTokens = inputToCommand(rawMessage).toArray(new String[0]);
 
                 if (messageTokens.length > 0 && messageTokens[0].equals("list")) {
@@ -115,7 +119,7 @@ public class DetectiveListener extends ListenerAdapter {
                 }
             }
             else if (textChannel.getName().equals(LOOKUP)) {
-
+                lookup(event, rawMessage);
             }
         }
     }
@@ -130,6 +134,7 @@ public class DetectiveListener extends ListenerAdapter {
         }
 
         for (InventoryItem inventoryItem : selectedCase.getInventory()) {
+            inventoryItem.setFounder(guild.getMemberById(id));
             guild.getTextChannelsByName(INVENTORY, true).get(0).sendMessageEmbeds(inventoryItem.getEmbed()).queue();
         }
 
@@ -180,6 +185,109 @@ public class DetectiveListener extends ListenerAdapter {
                 channel.deleteMessageById(messages.get(0).getIdLong()).complete();
             }
         } while (!messages.isEmpty());
+    }
+
+    private void lookup(GuildMessageReceivedEvent lookupEvent, String searchTerm) {
+        // lookup for locations
+        logger.info("searching for location...");
+        Category locations = lookupEvent.getGuild().getCategoriesByName(LOCATIONS, true).get(0);
+        for (TextChannel channel : locations.getTextChannels()) {
+            if (channelStringEquals(channel.getName(), searchTerm)) {
+                List<PermissionOverride> permissionOverrides = channel.getPermissionOverrides();
+                for (PermissionOverride permissionOverride : permissionOverrides) {
+                    if (permissionOverride.getDenied().contains(Permission.VIEW_CHANNEL)) {
+                        permissionOverride.delete().queue();
+                        lookupEvent.getMessage().reply("You discovered a new location: " + channel.getAsMention() + "!").queue();
+                        return;
+                    }
+                }
+                lookupEvent.getMessage().reply("We already knew about this location...").queue();
+                return;
+            }
+        }
+
+        // lookup for characters
+        logger.info("searching for character...");
+        Set<String> characterNames = new HashSet<>();
+        TextChannel biosChannel = lookupEvent.getGuild().getTextChannelsByName(BIOS, true).get(0);
+        List<Message> messages = biosChannel.getHistory().retrievePast(100).complete();
+        characterNames.addAll(messages.stream().map(message -> message.getEmbeds().get(0).getAuthor().getName().toLowerCase()).collect(Collectors.toSet()));
+        logger.info("got all found characters: " + characterNames.size());
+        if (characterNames.contains(searchTerm.toLowerCase())) {
+            lookupEvent.getMessage().reply("We already knew about this person...").queue();
+            return;
+        }
+        logger.info("search term not in existing characters...continuing search");
+        Message rulesMessage = lookupEvent.getGuild().getTextChannelsByName(RULES, true).get(0).getHistory().retrievePast(1).complete().get(0);
+        String caseId = rulesMessage.getEmbeds().get(0).getFooter().getText();
+        Case currentCase = getCaseById(caseId);
+        if (currentCase != null) {
+            for (Character character : currentCase.getCharacters()) {
+                if (character.getName().toLowerCase().equals(searchTerm.toLowerCase())) {
+                    characterNames.add(character.getName().toLowerCase());
+                    lookupEvent.getMessage().reply("You discovered a new person: " + character.getName() + "! I'll add them to the " + biosChannel.getAsMention()).queue();
+                    List<TextChannel> chatLogChannels = lookupEvent.getGuild().getCategoriesByName(CHAT_LOGS, true).get(0).getTextChannels();
+                    StringBuilder chatLogsMessageBuilder = new StringBuilder();
+                    chatLogsMessageBuilder.append("I also found some chat logs related to this person:");
+
+                    // search for any chat logs in case that contain this character
+                    for (ChatLog chatLog : currentCase.getChatLogs()) {
+                        if (chatLog.getParticipants().contains(character.getName())) {
+                            if (characterNames.containsAll(chatLog.getParticipants().stream().map(String::toLowerCase).collect(Collectors.toSet()))) {
+
+                                // search for appropriate text channel and update permissions
+                                for (TextChannel chatLogChannel : chatLogChannels) {
+                                    if (channelStringEquals(chatLogChannel.getName(), chatLog.getName())) {
+                                        List<PermissionOverride> permissionOverrides = chatLogChannel.getPermissionOverrides();
+                                        for (PermissionOverride permissionOverride : permissionOverrides) {
+                                            if (permissionOverride.getDenied().contains(Permission.VIEW_CHANNEL)) {
+                                                permissionOverride.delete().queue();
+                                                chatLogsMessageBuilder.append("\n" + chatLogChannel.getAsMention());
+                                                break;
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (chatLogsMessageBuilder.length() > "I also found some chat logs related to this person:".length()) {
+                        lookupEvent.getMessage().reply(chatLogsMessageBuilder.toString()).queue();
+                    }
+                    return;
+                }
+            }
+            lookupEvent.getMessage().reply("I couldn't find anything on that").queue();
+        }
+        else {
+            lookupEvent.getMessage().reply("Something went wrong... I seem to have lost the case files").queue();
+        }
+    }
+
+    private Case getCaseById(String id) {
+        File casesDir = new File(config.getCasePath());
+        File[] caseFiles = casesDir.listFiles();
+        if (caseFiles != null) {
+            ObjectMapper mapper = new ObjectMapper();
+            for (int i = 0; i < caseFiles.length; ++i) {
+                File caseFile = caseFiles[i];
+                try {
+                    Case detectiveCase = mapper.readValue(caseFile, Case.class);
+                    if (detectiveCase.getCaseId().equals(id)) {
+                        return detectiveCase;
+                    }
+                } catch (Exception e) {
+                    logger.error("Could not load case: " + caseFile.getName() + ": " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean channelStringEquals(String s1, String s2) {
+        return s1.toLowerCase().replace("-", " ").equals(s2.toLowerCase().replace("-", " "));
     }
 
     private List<String> inputToCommand(String message) {

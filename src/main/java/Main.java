@@ -13,10 +13,13 @@ public class Main {
     public static void main(String[] args) throws Exception {
         File file = new File("bot.yml");
         YmlConfig config = new ObjectMapper(new YAMLFactory()).readValue(file, YmlConfig.class);
+        DetectiveListener detectiveListener = new DetectiveListener(config);
         JDA jda = JDABuilder.createDefault(config.getDiscord().getToken())
-                .addEventListeners(new DetectiveListener(config))
+                .addEventListeners(detectiveListener)
                 .setActivity(Activity.listening("instructions"))
                 .build();
+        System.out.println("ID " + jda.getSelfUser().getIdLong());
+        detectiveListener.setId(jda.getSelfUser().getIdLong());
         jda.awaitReady();
     }
 }

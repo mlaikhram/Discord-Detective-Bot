@@ -12,8 +12,10 @@ public class FreeformEmbedBody {
 
     public EmbedBuilder applyToEmbedBuilder(EmbedBuilder embedBuilder) {
         embedBuilder.setDescription(description);
-        for (EmbedField embedField : fields) {
-            embedBuilder.addField(embedField.getName(), embedField.getValue(), embedField.isInline());
+        if (fields != null) {
+            for (EmbedField embedField : fields) {
+                embedBuilder.addField(embedField.getName(), embedField.getValue(), embedField.isInline());
+            }
         }
         embedBuilder.setImage(imageUrl);
 
