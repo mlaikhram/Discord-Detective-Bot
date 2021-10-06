@@ -8,8 +8,12 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.events.guild.GuildJoinEvent;
+import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
 import net.dv8tion.jda.api.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +65,78 @@ public class DetectiveListener extends ListenerAdapter {
 
         guild.createCategory(CHAT_LOGS).addPermissionOverride(guild.getPublicRole(), Collections.emptySet(), EnumSet.of(Permission.MESSAGE_WRITE)).queue();
         guild.createCategory(LOCATIONS).queue();
+
+        createGuildCommands(guild);
+    }
+
+    private void createGuildCommands(Guild guild) {
+        guild.updateCommands()
+                .addCommands(new CommandData("inspect", "Try to learn about something in your current location")
+                    .addOption(OptionType.STRING, "noun", "What to inspect", true))
+                .addCommands(new CommandData("photograph", "Take a picture of something in your current location")
+                    .addOption(OptionType.STRING, "noun", "What to take a picture of", true))
+                .addCommands(new CommandData("use", "Use an item in your current location")
+                    .addOption(OptionType.STRING, "item-id", "The id of the item to use", true)
+                    .addOption(OptionType.STRING, "noun", "What you want to use the item on", false))
+                .addCommands(new CommandData("unlock", "Unlock something in your current location")
+                    .addOption(OptionType.STRING, "noun", "What you want to unlock", true)
+                    .addOption(OptionType.STRING, "passcode", "What passcode to use", false)
+                    .addOption(OptionType.STRING, "item-id", "The id of the item to use", false))
+                .queue();
+    }
+
+    @Override
+    public void onSlashCommand(@Nonnull SlashCommandEvent event) { // TODO: check if channel is a location
+        event.deferReply().queue();
+        String channelName = event.getTextChannel().getName();
+        String command = event.getName();
+        OptionMapping noun = event.getOption("noun");
+        OptionMapping itemId = event.getOption("item-id");
+        OptionMapping passcode = event.getOption("passcode");
+
+        Message rulesMessage = event.getGuild().getTextChannelsByName(RULES, true).get(0).getHistory().retrievePast(1).complete().get(0);
+        String caseId = rulesMessage.getEmbeds().get(0).getFooter().getText();
+        Case currentCase = getCaseById(caseId);
+
+        Location currentLocation = currentCase.getLocations().stream().filter(location -> channelStringEquals(location.getName(), channelName)).findFirst().orElse(null);
+
+        if (currentLocation != null) {
+            LocationCommand matchingCommand = currentLocation.getCommands().stream()
+                    .filter(locationCommand -> locationCommand.getCommandType().toString().equalsIgnoreCase(command))
+                    .filter(locationCommand -> (noun == null && locationCommand.getNoun() == null) || (noun != null && noun.getAsString().equalsIgnoreCase(locationCommand.getNoun())))
+                    .filter(locationCommand -> (itemId == null && locationCommand.getItemId() == null) || (itemId != null && itemId.getAsString().equalsIgnoreCase(locationCommand.getItemId())))
+                    .filter(locationCommand -> (passcode == null && locationCommand.getPasscode() == null) || (passcode != null && passcode.getAsString().equalsIgnoreCase(locationCommand.getPasscode())))
+                    .findFirst().orElse(null);
+
+            if (matchingCommand != null) {
+                StringBuilder messageBuilder = new StringBuilder();
+                messageBuilder.append(matchingCommand.getSuccessMessage());
+                if (!matchingCommand.getUnlockItems().isEmpty()) {
+
+                    TextChannel inventoryChannel = event.getGuild().getTextChannelsByName(INVENTORY, true).get(0);
+                    List<Message> messages = inventoryChannel.getHistory().retrievePast(100).complete();
+                    Set<String> itemNames = new HashSet<>(messages.stream().map(message -> message.getEmbeds().get(0).getAuthor().getName().toLowerCase()).collect(Collectors.toSet()));
+                    logger.info("got all found items: " + itemNames.size());
+                    if (itemNames.contains(matchingCommand.getUnlockItems().get(0).getItemId().toLowerCase())) {
+                        messageBuilder.append("\nI already gave you the items I found for this action.");
+                    } else {
+                        messageBuilder.append("\nI've added these items I found to your " + inventoryChannel.getAsMention() + ":");
+
+                        for (InventoryItem inventoryItem : matchingCommand.getUnlockItems()) {
+                            messageBuilder.append("\n" + inventoryItem.getTitle());
+                            inventoryItem.setFounder(event.getMember());
+                            inventoryChannel.sendMessageEmbeds(inventoryItem.getEmbed()).queue();
+                        }
+                    }
+                }
+                event.getHook().sendMessage(messageBuilder.toString()).queue();
+            } else {
+                event.getHook().sendMessage("That doesn't sound like it'll help here...").queue();
+            }
+        }
+        else {
+            event.getHook().sendMessage("I can't do that here! Ask me in a valid `Location`").queue();
+        }
     }
 
     @Override
@@ -70,7 +146,7 @@ public class DetectiveListener extends ListenerAdapter {
             String rawMessage = event.getMessage().getContentRaw();
             if (textChannel.getName().equals(ADMIN_CONSOLE)) {
                 String[] messageTokens = inputToCommand(rawMessage).toArray(new String[0]);
-
+                
                 if (messageTokens.length > 0 && messageTokens[0].equals("list")) {
                     File casesDir = new File(config.getCasePath());
                     File[] caseFiles = casesDir.listFiles();
@@ -208,10 +284,9 @@ public class DetectiveListener extends ListenerAdapter {
 
         // lookup for characters
         logger.info("searching for character...");
-        Set<String> characterNames = new HashSet<>();
         TextChannel biosChannel = lookupEvent.getGuild().getTextChannelsByName(BIOS, true).get(0);
         List<Message> messages = biosChannel.getHistory().retrievePast(100).complete();
-        characterNames.addAll(messages.stream().map(message -> message.getEmbeds().get(0).getAuthor().getName().toLowerCase()).collect(Collectors.toSet()));
+        Set<String> characterNames = new HashSet<>(messages.stream().map(message -> message.getEmbeds().get(0).getAuthor().getName().toLowerCase()).collect(Collectors.toSet()));
         logger.info("got all found characters: " + characterNames.size());
         if (characterNames.contains(searchTerm.toLowerCase())) {
             lookupEvent.getMessage().reply("We already knew about this person...").queue();
@@ -225,7 +300,8 @@ public class DetectiveListener extends ListenerAdapter {
             for (Character character : currentCase.getCharacters()) {
                 if (character.getName().toLowerCase().equals(searchTerm.toLowerCase())) {
                     characterNames.add(character.getName().toLowerCase());
-                    lookupEvent.getMessage().reply("You discovered a new person: " + character.getName() + "! I'll add them to the " + biosChannel.getAsMention()).queue();
+                    lookupEvent.getMessage().reply("You discovered a new person: `" + character.getName() + "`! I'll add them to the " + biosChannel.getAsMention()).queue();
+                    biosChannel.sendMessageEmbeds(character.getEmbed()).queue();
                     List<TextChannel> chatLogChannels = lookupEvent.getGuild().getCategoriesByName(CHAT_LOGS, true).get(0).getTextChannels();
                     StringBuilder chatLogsMessageBuilder = new StringBuilder();
                     chatLogsMessageBuilder.append("I also found some chat logs related to this person:");

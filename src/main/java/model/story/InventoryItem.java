@@ -20,10 +20,9 @@ public class InventoryItem implements DiscordEmbeddable {
     public MessageEmbed getEmbed() {
         EmbedBuilder embedBuilder = new EmbedBuilder();
         embedBuilder.setTitle(title);
-        embedBuilder.setAuthor(itemId);
+        embedBuilder.setAuthor(itemId, null, itemType.getIconUrl());
         embedBuilder.setColor(Color.decode(color));
         embedBuilder = embedBody.applyToEmbedBuilder(embedBuilder);
-        embedBuilder.setThumbnail(itemType.getIconUrl());
         embedBuilder
                 .setFooter((itemType == ItemType.PHOTO ? "Taken by " : "Found by ") + founder
                         .getEffectiveName(), founder
